@@ -4,8 +4,7 @@ import { ethers } from "ethers";
 import ipfs from "./ipfs";
 import { abi } from "./contracts/AlbumNft.json";
 import ShowCard from "./components/ShowCard.js";
-import  BSON from "bson";
-import readWrite from './read_write_files'
+import CreateAlbum from "./components/CreateAlbum.js";
 
 import "./App.css";
 
@@ -16,8 +15,9 @@ class App extends Component {
     super(props)
     
     this.state = {
-      album:Object(),
-      songs: Array(),
+      album:{},
+      albumCover:'Here is the album cover',
+      songs: [],
       provider: null,
       buffer: Array(),
       account: null,
@@ -25,7 +25,7 @@ class App extends Component {
       contractSigner:null,
       albumSet:false,
       albumBuffer:[],
-      albumHash:[],
+      albumMetadat: {}
     }
     this.captureFile = this.captureFile.bind(this);
     this.onSubmit = this.onSubmit.bind(this);
@@ -34,7 +34,7 @@ class App extends Component {
   }
 
 
-componentDidMount = async () => {
+componentWillMount = async () => {
 
   // const ERC20_ABI = [
   //   "function getAlbum()public view returns (string memory, string memory,string memory,string memory)",
@@ -92,45 +92,63 @@ componentDidMount = async () => {
    }
    
   };
-    addSongsToContract =  async (song) =>{
-    const tx = await this.state.contractSigner.addSong(song.hash,song.title)
-    await tx.wait()
-    console.log(tx)
-   await this.state.contractSigner.getSongs().then(results => {
-   this.setState({songs: results, showPlayer: !!this.state.songs })
- })
+  
+  createdFiles = (e) =>{
+    e.preventDefault();
+    console.log(e)
+    // const element = e.target
+    // console.log(element.albumTitle.value,element.artist.value, element.genre.value, element.audioFiles.files)
+  }
  
- 
- }
     captureFile = (e) =>{
       e.preventDefault();  
+      
+      const arrayOfPayloads=[]
       const files = e.target.files
-      if(files[0]['name'].split(".")[1] =="jpg"){
+      for (let i = 0; i < files.length; i++){
+        
+      if(files[i]['name'].split(".")[1] =="jpg"){
+        console.log("Im in JPG")
+        let payload = {}
         const reader = new window.FileReader();
         reader.readAsArrayBuffer(files[0])
         reader.onloadend = () => {
+        payload ={album:{buffer:''}}
+          payload.album.buffer = Buffer(reader.result)
           this.setState({ album: {...this.state.album, buffer: Buffer(reader.result)}})
+          arrayOfPayloads.push(payload)
       }
       }
       else {
-      for (let i = 0; i < files.length; i++){
+      console.log("Im in Songs")
+      let payload = {}
+       payload = {title:"", buffer:""}
       const title = files[i]['name'].split(".")[0]
-      const payload = {}
-      payload['title']= title
+      payload.title = title
       const reader = new window.FileReader();
       reader.readAsArrayBuffer(files[i])
       reader.onloadend = () => {
-          payload['buffer'] = Buffer(reader.result)
+          payload.buffer = Buffer(reader.result)
+
        this.setState({ songs: [...this.state.songs,payload]})
+       arrayOfPayloads.push(payload)
       }
       
       }
       
-    }
+      }
+      console.log(arrayOfPayloads)
+      return arrayOfPayloads
 
     }
     onSubmit  = (e) =>{
       e.preventDefault();
+      console.log(this.state)
+      const album = {
+        title: "Just the facts",
+        artist:" The Factualist",
+        year: "2022"
+      }
       if(!this.state.album['cover_hash']){
         ipfs.files.add(this.state.album.buffer,(error, result) => {
           if(error){
@@ -155,7 +173,7 @@ componentDidMount = async () => {
                 else{
                   song['hash'] = result[0].hash 
                   song.buffer =""
-                  this.addSongsToContract(song)
+
                 }
               })
             })
@@ -203,7 +221,47 @@ componentDidMount = async () => {
       }
     
       
-      
+    //   { 
+    //     "name": "Just the facts",
+    //     "descrption" : "The Factualist debut album, `Just the facts`",
+    //     "image" : "www.ipfs.io/<Hash-to-album-cover>",
+    //     "attributes" : [
+    //         "album": {
+                // "title": "Just the facts",
+                // "artist":" The Factualist",
+                // "year" : "2022"
+                
+    //         }
+    //         "songs":[
+    //             {
+    //                 "title": "song_1",
+    //                 "link" : "www.ipfs.io/<song hash>",
+                    
+    //             },
+    //             {
+    //                 "title": "song_2",
+    //                 "link" : "www.ipfs.io/<song hash>",
+                    
+    //             },
+    //             {
+    //                 "title": "song_3",
+    //                 "link" : "www.ipfs.io/<song hash>",
+                    
+    //             },
+    //             {
+    //                 "title": "song_4",
+    //                 "link" : "www.ipfs.io/<song hash>",
+                    
+    //             },
+    //             {
+    //                 "title": "song_5",
+    //                 "link" : "www.ipfs.io/<song hash>",
+                    
+    //             }
+    //         ]
+            
+    //     ]
+    // }
 
       // const blob =new Blob([JSON.stringify(jsonPayload)],{type:"application/json"})
       // console.log(Buffer.from(jsonPayload))
@@ -243,8 +301,8 @@ componentDidMount = async () => {
       </main>
     </div> 
     <ShowCard album={this.state.album} songs={this.state.songs} showPlayer={this.state.showPlayer}/>
+    
   
-      
       </>
     );
   }
