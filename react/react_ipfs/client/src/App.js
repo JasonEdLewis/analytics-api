@@ -105,40 +105,40 @@ componentWillMount = async () => {
       
       const arrayOfPayloads=[]
       const files = e.target.files
-      for (let i = 0; i < files.length; i++){
+      // for (let i = 0; i < files.length; i++){
         
-      if(files[i]['name'].split(".")[1] =="jpg"){
-        console.log("Im in JPG")
-        let payload = {}
-        const reader = new window.FileReader();
-        reader.readAsArrayBuffer(files[0])
-        reader.onloadend = () => {
-        payload ={album:{buffer:''}}
-          payload.album.buffer = Buffer(reader.result)
-          this.setState({ album: {...this.state.album, buffer: Buffer(reader.result)}})
-          arrayOfPayloads.push(payload)
-      }
-      }
-      else {
-      console.log("Im in Songs")
-      let payload = {}
-       payload = {title:"", buffer:""}
-      const title = files[i]['name'].split(".")[0]
-      payload.title = title
-      const reader = new window.FileReader();
-      reader.readAsArrayBuffer(files[i])
-      reader.onloadend = () => {
-          payload.buffer = Buffer(reader.result)
+      // if(files[i]['name'].split(".")[1] =="jpg"){
+      //   console.log("Im in JPG")
+      //   let payload = {}
+      //   const reader = new window.FileReader();
+      //   reader.readAsArrayBuffer(files[0])
+      //   reader.onloadend = () => {
+      //   payload ={album:{buffer:''}}
+      //     payload.album.buffer = Buffer(reader.result)
+      //     this.setState({ album: {...this.state.album, buffer: Buffer(reader.result)}})
+      //     arrayOfPayloads.push(payload)
+      // }
+      // }
+      // else {
+      // console.log("Im in Songs")
+      // let payload = {}
+      //  payload = {title:"", buffer:""}
+      // const title = files[i]['name'].split(".")[0]
+      // payload.title = title
+      // const reader = new window.FileReader();
+      // reader.readAsArrayBuffer(files[i])
+      // reader.onloadend = () => {
+      //     payload.buffer = Buffer(reader.result)
 
-       this.setState({ songs: [...this.state.songs,payload]})
-       arrayOfPayloads.push(payload)
-      }
+      //  this.setState({ songs: [...this.state.songs,payload]})
+      //  arrayOfPayloads.push(payload)
+      // }
       
-      }
+      // }
       
-      }
-      console.log(arrayOfPayloads)
-      return arrayOfPayloads
+      // }
+      // console.log(arrayOfPayloads)
+      // return arrayOfPayloads
 
     }
     onSubmit  = (e) =>{

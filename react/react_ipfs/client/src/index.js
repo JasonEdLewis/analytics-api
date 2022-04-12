@@ -1,12 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import * as serviceWorker from './serviceWorker';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { PersistGate } from 'redux-persist/integration/react';
+import { persistStore } from 'redux-persist';
+// import persistor from './configureStore'
+import store from './app/store'
+import { Provider } from 'react-redux'
 import './index.css';
 import Layout from './components/Layouts';
 import Home from './components/Home';
 import App from './App';
 import CreateAlbum from './components/CreateAlbum';
-import * as serviceWorker from './serviceWorker';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 
 export default function BaseApp (){
     const styles ={
@@ -16,7 +22,11 @@ export default function BaseApp (){
         marginRight: '5%',
         // border: '1px solid'
     }
+    let persistor = persistStore(store);
     return (
+      <React.StrictMode>
+      <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
     <div style={styles}>
     <BrowserRouter>
       <Routes>
@@ -28,6 +38,9 @@ export default function BaseApp (){
       </Routes>
     </BrowserRouter>
     </div>
+    </PersistGate>
+    </Provider>
+    </React.StrictMode>
     )
 
 }
