@@ -19,7 +19,7 @@ class App extends Component {
       albumCover:'Here is the album cover',
       songs: [],
       provider: null,
-      buffer: Array(),
+      buffer: [],
       account: null,
       showPlayer: false,
       contractSigner:null,
@@ -279,11 +279,8 @@ componentWillMount = async () => {
     return (
       <>
      <div className="App">
-      <nav className="navbar pure-menu pure-menu-horizontal">
-        <a href="#" className="pure-menu-heading pure-menu-link">NFTp</a>
-      </nav>
-
-      <main className="container">
+   
+     <main className="container">
         <div className="pure-g">
           <div className="pure-u-1-1">
             <h1>Upload Your song here....</h1>
@@ -309,3 +306,6 @@ componentWillMount = async () => {
 }
 
 export default App;
+
+
+

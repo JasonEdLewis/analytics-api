@@ -1,4 +1,4 @@
-import React, { Component, useState } from "react";
+import React, { useState } from "react";
 import { useSelector, useDispatch } from 'react-redux';
 import { updateAlbum, updateCoverHash, updateAlbumTitle, reset,addSongs , removeSong } from "../features/album/albumSlice";
 import ipfs from "../ipfs";
@@ -6,6 +6,7 @@ import Player from "./Player";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
+import SongList from './SongList';
 
 
 
@@ -41,29 +42,29 @@ const CreateAlbum = ()=> {
       if(coverHash) payload.coverHash = coverHash
       if(albumTitle) payload.albumTitle = albumTitle
       if(artist) payload.artist = artist
+      if(genre) payload.genre = genre
       if(songs.length > 0) payload.songs = songs
 
       console.log(payload)
-      e.target.clear()
       // if(cover && albumTitle && artist && genre && songs) 
-      // dispatch(updateAlbum({coverHash,albumTitle,artist,year:"2022",genre,songs}))
+      dispatch(updateAlbum(payload))
       // dispatch(updateAlbum({albumTitle,artist,year:"1972", genre}))
  
 
     }
-    const processFilesToIpfs = async (buffer) =>{
-    let hash;
+    const processFilesToIpfs = (buffer) =>{
      ipfs.files.add(buffer,(error, result) => {
         console.log('in ipfs...')
-        if(error) return console.log(error);
-        hash = result[0].hash
-        // console.log(hash)
-        setCoverHash(hash)
-        dispatch(updateCoverHash({coverHash: hash}))
-      })
-      
-      // 
-      
+        if(error){
+          return console.log(error)
+        }
+        else {
+          return result[0].hash
+
+            }
+          }
+        )  
+
     }
     const handleAlbumCover = ( e )=> {
       const files = e.target.files
@@ -72,18 +73,48 @@ const CreateAlbum = ()=> {
         const reader = new window.FileReader();
         reader.readAsArrayBuffer(files[0])
         reader.onloadend = () => {
-         processFilesToIpfs(Buffer(reader.result))
-         e.target.files.clear()
+         let hash = processFilesToIpfs(Buffer(reader.result))
+         setCoverHash(hash)
+         dispatch(updateAlbum({coverHash: hash}))
         }
     
   }
 }
    
+  const handleSongs  = async (e) =>{
+    const files = e.target.files
+    let i = 0
+    for await (let file of files){
+      i++
+      let song = {}, hash
+      const title = file['name'].split(".")[0]
+      song.id = i
+      song.title = title
+      song.artist = artist || album.album.artist
+      song.album = albumTitle || album.album.albumTitle
+      const reader = new window.FileReader();
+      reader.readAsArrayBuffer(file);
+      reader.onloadend = async () => {
+        await ipfs.files.add(Buffer(reader.result),(error, result) => error ? console.log(error) : 
+         song.hash = result[0].hash)
+         setSongs(songs => [...songs, song])
+       }
+
+    }
+
+  }
+ const removeSong = (id) =>{
+   let updatedSongs = songs.filter(s => s.id !== id)
+   setSongs(updatedSongs)
+ }
+  
   return (
     <div style={{padding:"5%", width:"70%", marginLeft:"15%"}}>
-      <Card style={{ padding: "5%" }}>
+      <Card style={{ padding: "5%" }} >
+        {album.album.artist && album.album.albumTitle && <Card.Header as="h5" className="text-center"><b>{album.album.artist}: </b>{album.album.albumTitle} </Card.Header>}
         <Card.Body>
           <Card.Img variant="top" src={`https://ipfs.io/ipfs/${album.album.coverHash}` || coverPreview } />
+          {songs && <SongList songs={songs} removeSong={removeSong}/>}
             <Form noValidate validated={validated} onSubmit={(e)=> dispatchAll(e)}>
             <br></br>
             <Form.Control type="file" className="custom-file-input" id="cover" onChange={(e)=> handleAlbumCover(e)}/>
@@ -117,8 +148,8 @@ const CreateAlbum = ()=> {
               setGenre(e.target.value)}}>
             <option value={null}> {`${album.album.genre}` || "Select a genre..."}</option>
             <option value="Hip-Hop">Hip-Hop</option>
-            <option value="r_and_b">R&B</option>
-            <option value="rock">Rock</option>
+            <option value="R&B">R&B</option>
+            <option value="Rock">Rock</option>
             </Form.Select>
             <Form.Control.Feedback type={ validated ? "" : "invalid"} >
               {/* Please enter album genre. */}
@@ -128,24 +159,7 @@ const CreateAlbum = ()=> {
               Upload your music files here. Want to upload your <b>Album Cover?</b> Use upload button <b>Above ⬆</b>.
             </Form.Text>
             <div className="custom-file">
-              <Form.Control type="file"  className="custom-file-input" id="audioFiles" multiple="multiple" onChange={(e)=> {
-                const files = e.target.files
-                for(let  i = 0; i < files.length; i++){
-                  let song = {}
-                  const title = files[i]['name'].split(".")[0]
-                  song["id"] = i+1
-                  song["title"] = title
-                  song["album"] = albumTitle
-                  const reader = new window.FileReader();
-                  reader.readAsArrayBuffer(files[i]);
-                  reader.onloadend = () => {
-                    song["hash"]= Buffer(reader.result)
-                    setSongs(songs => [...songs, song])
-                  }
-                }
-                }
-              }
-              />
+              <Form.Control type="file"  className="custom-file-input" id="audioFiles" multiple="multiple" onChange={(e)=> handleSongs(e)}/>
             </div>
             <br></br>
             <Button variant="secondary" type="submit" style={{marginRight:"2%"}}>

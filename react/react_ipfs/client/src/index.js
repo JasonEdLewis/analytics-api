@@ -8,7 +8,7 @@ import { persistStore } from 'redux-persist';
 import store from './app/store'
 import { Provider } from 'react-redux'
 import './index.css';
-import Layout from './components/Layouts';
+import Navigation from './components/Navigation';
 import Home from './components/Home';
 import App from './App';
 import CreateAlbum from './components/CreateAlbum';
@@ -16,10 +16,7 @@ import CreateAlbum from './components/CreateAlbum';
 
 export default function BaseApp (){
     const styles ={
-        width: '100%',
-        height: '100%',
-        marginLeft: '5%%',
-        marginRight: '5%',
+       
         // border: '1px solid'
     }
     let persistor = persistStore(store);
@@ -30,7 +27,7 @@ export default function BaseApp (){
     <div style={styles}>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/" element={<Navigation/>}>
             <Route index element={<Home />} />
             <Route path="Experience" element={<App />} />
             <Route path="create" element={<CreateAlbum />} />
