@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useSelector, useDispatch } from 'react-redux';
-import { updateAlbum, updateCoverHash, updateAlbumTitle, reset,addSongs , removeSong } from "../features/album/albumSlice";
+import { updateAlbum, reset} from "../features/album/albumSlice";
+import Accordion from 'react-bootstrap/Accordion';
 import ipfs from "../ipfs";
-import Player from "./Player";
+
+// import Player from "./Player";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
@@ -12,18 +14,22 @@ import SongList from './SongList';
 
 
 const CreateAlbum = ()=> {
+  const album = useSelector((state)=> state.album)
+  const dispatch  = useDispatch()
+
   const [ coverHash, setCoverHash] = useState("")
   const [ coverPreview, setCoverPreview ]= useState("")
   const [ albumTitle, setAlbumTitle] = useState("")
   const [ artist, setArtist] = useState("")
   const [ genre, setGenre] = useState("")
   const [ albumURI, setAlbumURI] = useState("")
-  const [ songs, setSongs] = useState([])
+  const [ songs, setSongs] = useState(album.album.songs || [])
   const [validated, setValidated] = useState(false);
 
   
-  const album = useSelector((state)=> state.album)
-  const dispatch  = useDispatch()
+  // console.log("https://ipfs.io/ipfs/QmVDa1UnYwLsb1YQe1Et5jLPNDQBJqoFqWfNBrH41Xxv21")
+  
+  
   // dispatch(reset())
 
   // console.log(album.album.coverHash)
@@ -109,14 +115,19 @@ const CreateAlbum = ()=> {
  }
   
   return (
-    <div style={{padding:"5%", width:"70%", marginLeft:"15%"}}>
+    <div  style={{width: '50%', height: '50%', marginLeft:"25%", padding:"5%"}}>
       <Card style={{ padding: "5%" }} >
         {album.album.artist && album.album.albumTitle && <Card.Header as="h5" className="text-center"><b>{album.album.artist}: </b>{album.album.albumTitle} </Card.Header>}
         <Card.Body>
           <Card.Img variant="top" src={`https://ipfs.io/ipfs/${album.album.coverHash}` || coverPreview } />
           {songs && <SongList songs={songs} removeSong={removeSong}/>}
+          <Accordion defaultActiveKey={['0']} >
+              <Accordion.Item eventKey="0">
+              <Accordion.Header className="text-center">Edit Album Details</Accordion.Header>
+              <Accordion.Body>
             <Form noValidate validated={validated} onSubmit={(e)=> dispatchAll(e)}>
             <br></br>
+            
             <Form.Control type="file" className="custom-file-input" id="cover" onChange={(e)=> handleAlbumCover(e)}/>
             <br></br>
             <Form.Group className="mb-3" controlId="albumTitle" onChange={(e)=> {
@@ -169,6 +180,9 @@ const CreateAlbum = ()=> {
              Reset State
             </Button>
           </Form>
+          </Accordion.Body>
+          </Accordion.Item>
+          </Accordion>
         </Card.Body>
       </Card>
     </div>)

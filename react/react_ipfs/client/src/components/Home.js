@@ -13,11 +13,12 @@ export const Home = () => {
     }
   return (
     <div >
-        <Container >
+        <Container fluid="md" >
   <Row>
-    <Col>1 of 1</Col>
-    <Col>2 of 2</Col>
-    <Col>3 of 3</Col>
+    <Col className="md-3">1 of 4</Col>
+    <Col className="md-3">2 of 4</Col>
+    <Col className="md-3">3 of 4</Col>
+    <Col>4 of 4</Col>
   </Row>
 </Container>
     </div>

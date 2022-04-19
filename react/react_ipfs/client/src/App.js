@@ -1,11 +1,11 @@
-import React, { Component} from "react";
+import React, { Component, useEffect} from "react";
 import Player from "./components/Player"
 import { ethers } from "ethers";
 import ipfs from "./ipfs";
 import { abi } from "./contracts/AlbumNft.json";
 import ShowCard from "./components/ShowCard.js";
 import CreateAlbum from "./components/CreateAlbum.js";
-
+import { $ }  from 'react-jquery-plugin';
 import "./App.css";
 
 class App extends Component {
@@ -15,7 +15,7 @@ class App extends Component {
     super(props)
     
     this.state = {
-      album:{},
+      album:null,
       albumCover:'Here is the album cover',
       songs: [],
       provider: null,
@@ -35,6 +35,7 @@ class App extends Component {
 
 
 componentWillMount = async () => {
+  
 
   // const ERC20_ABI = [
   //   "function getAlbum()public view returns (string memory, string memory,string memory,string memory)",
@@ -49,38 +50,36 @@ componentWillMount = async () => {
   const signer = provider.getSigner();
   const contractSigner = contract.connect(signer)  
   this.setState({contractSigner})
-  const album = await contractSigner.getAlbum()
+  // const album = await $.getJSON("https://ipfs.io/ipfs/QmVDa1UnYwLsb1YQe1Et5jLPNDQBJqoFqWfNBrH41Xxv21")
+ 
   // const songs = await contractSigner.getSongs()
-  console.log("the Album: ")
+  // console.log(`the Album: ${this.state.album}`)
  
   // console.log(songs)
-  const albumObj ={
-    "cover_hash":album[0],
-    "title": album[1],
-    "artist":album[2],
-    "year": album[3],
-    "songs": album[4] || [],
-    }
+  // const albumObj ={
+  //   "cover_hash":album[0],
+  //   "title": album[1],
+  //   "artist":album[2],
+  //   "year": album[3],
+  //   "songs": album[4] || [],
+  //   }
   // console.log(albumObj)
   // return
-  const loadedSongs =[]
-  albumObj.songs.forEach(song=>{
-    const obj ={
-      "URI": `https://ipfs.io/ipfs/${song.hash}`,
-      "title": song.title,
-      "artist": song.artist,
-      "album" : song.album,
-      "media": song.media
-    }
-    loadedSongs.push(obj)
-  })
-  this.setState({album: albumObj, songs:loadedSongs , showPlayer:!!loadedSongs})
-  console.log("Initializing ......")
-  // console.log(`Album: ${this.state.album.title}`)
-  // console.log("The Songs: ")
-  // console.log(this.state.songs)
+  // const loadedSongs =[]
+  // albumObj.songs.forEach(song=>{
+  //   const obj ={
+  //     "URI": `https://ipfs.io/ipfs/${song.hash}`,
+  //     "title": song.title,
+  //     "artist": song.artist,
+  //     "album" : song.album,
+  //     "media": song.media
+  //   }
+  //   loadedSongs.push(obj)
   
-
+  // })
+  // this.setState({album: albumObj, songs:loadedSongs , showPlayer:!!loadedSongs})
+  console.log("Initializing ......")
+  
    this.removeSong = async() =>{
     const tx = await contractSigner.remove()
     await tx.wait()
@@ -278,7 +277,7 @@ componentWillMount = async () => {
     
     return (
       <>
-     <div className="App">
+     {/* <div className="App">
    
      <main className="container">
         <div className="pure-g">
@@ -290,16 +289,14 @@ componentWillMount = async () => {
             <form onSubmit={this.onSubmit} >
               <input type='file' onChange={this.captureFile} multiple/>
               <input type='submit' />
-            </form>
-            {/* <button onClick={() => this.removeSong()}>Remove Song</button> */}
+            </form> 
+             <button onClick={() => this.removeSong()}>Remove Song</button> 
             <button onClick={()=> this.getAlbumURI()}>Mint Album</button>
           </div>
         </div>
       </main>
-    </div> 
+    </div>  */}
     <ShowCard album={this.state.album} songs={this.state.songs} showPlayer={this.state.showPlayer}/>
-    
-  
       </>
     );
   }
