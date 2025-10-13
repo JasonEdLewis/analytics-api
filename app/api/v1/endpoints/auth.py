@@ -4,10 +4,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.config import settings
-from app.core.security import verify_password, create_access_token 
+from app.core.security import get_password_hash, verify_password, create_access_token 
 from app.db.session import get_db
 from app.models.user import User
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 
@@ -37,3 +37,43 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     "access_token": access_token, 
     "token_type": "bearer"
   }
+  
+# app/api/v1/endpoints/auth.py
+
+@router.post("/signup")
+async def signup(
+    email: EmailStr,
+    password: str,
+    full_name: str,
+    company_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Public endpoint for new tenant signup.
+    Creates both tenant and first user.
+    """
+    # Create tenant
+    tenant = Tenant(
+        name=company_name,
+        slug=slugify(company_name),
+        is_active=True
+    )
+    db.add(tenant)
+    await db.flush()
+    
+    # Create first user (admin)
+    user = User(
+        tenant_id=tenant.id,
+        email=email,
+        hashed_password=get_password_hash(password),
+        full_name=full_name,
+        is_active=True,
+        is_superuser=True  # First user is tenant admin
+    )
+    db.add(user)
+    await db.commit()
+    
+    # Send welcome email (implement this)
+    # send_welcome_email(email, tenant.name)
+    
+    return {"message": "Account created! Check your email."}

@@ -47,10 +47,10 @@ offset: int = 0, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(ve
     query = query.where(EventModel.event_name == event_name)
     
   if start_date:
-    query = query.where(EventModel.start_date == start_date)
+    query = query.where(EventModel.created_at >= start_date)
   
   if end_date:
-    query = query.where(EventModel.end_date == end_date)
+    query = query.where(EventModel.created_at <= end_date)
     
   # Order by newest first
   query = query.order_by(EventModel.created_at.desc())

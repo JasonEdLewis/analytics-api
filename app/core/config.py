@@ -4,6 +4,7 @@ from typing import List, Optional
 class Settings(BaseSettings):
   """Application settings loaded from environment variables."""
   #API Configuration
+  PROJECT_NAME:str ="Analytics API"
   API_V1_PREFIX: str
   DEBUG: bool = False
 

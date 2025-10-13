@@ -36,3 +36,7 @@ psql analytics_api
 # Check specific table
 \d <tableName>
 \d events
+
+
+# Run server FROM ROOT
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
