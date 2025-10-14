@@ -26,7 +26,9 @@ async def create_event(event_in: EventCreate, db: AsyncSession = Depends(get_db)
   }
   """
   event = EventModel(tenant_id=tenant.id,**event_in.model_dump())
+  print("3️⃣ ENDPOINT: Using session")
   db.add(event)
+  print("4️⃣ ENDPOINT: Done")
   await db.commit() 
   await db.refresh(event)
   

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.api.v1.endpoints import events, analytics, tenants, auth
 
 # Create FastAPI application
 app = FastAPI(
@@ -37,9 +38,6 @@ async def root():
         "health": "/health"
     }
 
-
-# TODO: Include routers when endpoints are ready
-from app.api.v1.endpoints import events, analytics, tenants, auth
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["authentication"])
 app.include_router(tenants.router, prefix=f"{settings.API_V1_PREFIX}/tenants", tags=["tenants"])
 app.include_router(events.router, prefix=f"{settings.API_V1_PREFIX}/events", tags=["events"])

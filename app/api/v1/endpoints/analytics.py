@@ -44,10 +44,10 @@ async def get_event_count(event_name: str = None, start_date: datetime = None, e
         query = query.where(EventModel.event_name == event_name)
 
     if start_date:
-        query = query.where(EventModel.start_date == start_date)
+        query = query.where(EventModel.created_at >= start_date)
 
     if end_date:
-        query = query.where(EventModel.end_date == end_date)
+        query = query.where(EventModel.created_at <=end_date)
 
     result = await db.execute(query)
     count = result.scalar()

@@ -1,5 +1,47 @@
 
 
+# Connect to PostgreSQL BASH
+  psql postgres
+# Inside psql:
+  # create database
+  CREATE DATABASE <db-name>;
+  CREATE USER <username> WITH PASSWORD '<password>';
+  GRANT ALL PRIVILEGES ON DATABASE <db-name> TO postgres;
+  # example
+  CREATE DATABASE analytics_api;
+  CREATE USER postgres WITH PASSWORD 'postgres';
+  GRANT ALL PRIVILEGES ON DATABASE analytics_api TO postgres;
+# Exit psql 
+  \q
+
+# IN .env file
+  DATABASE_URL=postgresql+asyncpg://<username>:<password>@localhost:5432/<db-name>
+  # example
+  DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/analytics_api
+
+  postgresql+asyncpg://postgres:postgres@localhost:5432/analytics_api
+    │                    │        │        │         │    │
+    │                    │        │        │         │    └─ Database name
+    │                    │        │        │         └────── Port
+    │                    │        │        └──────────────── Host
+    │                    │        └───────────────────────── Password
+    │                    └────────────────────────────────── Username
+    └─────────────────────────────────────────────────────── Driver
+
+  # Production
+    DATABASE_URL=postgresql+asyncpg://admin:SecurePass123@localhost:5432/analytics_api
+                                      ^^^^^  ^^^^^^^^^^^^^
+                                      USER   PASSWORD
+
+  # On local Mac (no password)
+    DATABASE_URL=postgresql+asyncpg://your_username@localhost:5432/analytics_api
+                                      ^^^^^^^^^^^^^
+                                      (no password needed)
+  # Docker
+    DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/analytics_api
+                                      ^^^^^^^^ ^^^^^^^^ ^^
+                                      USER     PASSWORD HOST changes to "db"!
+
 # Run Analytics API DB
 psql analytics_api
 
@@ -40,3 +82,6 @@ psql analytics_api
 
 # Run server FROM ROOT
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# API swagger docs
+http://localhost:8000/docs

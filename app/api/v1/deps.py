@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload 
 from app.core.config import settings
 from app.core.security import verify_token 
 from app.db.session import get_db
@@ -27,11 +28,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme),
   user_id = verify_token(token) 
   if user_id is None:
     raise credentials_exception
-
-   #Get user from database
+  #Get user from database
   result = await db.execute(select(User).where(User.id == int(user_id))) 
   user = result.scalar_one_or_none()
-  
+
   if user is None:
     raise credentials_exception
   if not user.is_active:
@@ -46,7 +46,7 @@ async def verify_api_key(x_api_key: str = Header(...), db: AsyncSession = Depend
   """
   Verify API key and return associated tenant. Used for server-to-server event ingestion. 
   """
-  result = await db.execute(select(APIKey).where(APIKey.key == x_api_key) .where(APIKey.is_active == True))
+  result = await db.execute(select(APIKey).options(joinedload(APIKey.tenant)).where(APIKey.key == x_api_key) .where(APIKey.is_active == True))
   api_key = result.scalar_one_or_none()
   if not api_key:
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
@@ -54,4 +54,4 @@ async def verify_api_key(x_api_key: str = Header(...), db: AsyncSession = Depend
   api_key.last_used_at = func.now() 
   await db.commit()
   
-  return  api_key
+  return  api_key.tenant
