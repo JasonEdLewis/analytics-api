@@ -85,3 +85,42 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # API swagger docs
 http://localhost:8000/docs
+
+
+# DOCKER 
+docker build -t  <image_name_of_your_choosing>:<version_of_your_choosing> . # from root dont forget the '.'
+# example
+docker build -t analytics-api:latest .
+docker images | grep <image_youre_looking_for>
+
+docker-compose up -d --build (start in detached mode)
+
+docker-compose down
+# follow logs (live)
+docker-compose logs -f
+
+# follow only api logs (live)
+docker-compose logs -f api
+
+# follow only db logs (live)
+docker-compose logs -f db
+
+docker-compose ps
+
+
+# Stop containers
+docker-compose down
+
+# Remove volumes (fresh start)
+docker-compose down -v
+
+# Clean up
+docker system prune -f
+
+# Check for hidden characters or spaces
+cat -A .env.docker
+
+# Execute commands in docker container started with docker-compose
+docker-compose exec <container_name_from_service_docker-compose_yaml, service_name> <cmd> <path/to/file.py>
+# example
+docker-compose exec api python app/scripts/load_test_data.py

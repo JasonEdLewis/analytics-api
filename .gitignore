@@ -19,3 +19,10 @@ htmlcov/
 # Database
 *.db
 *.sqlite
+# Add to .gitignore
+.env.docker
+.env.production
+.env.*
+
+# But commit a template
+!.env.docker.example
