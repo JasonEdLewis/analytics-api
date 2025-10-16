@@ -25,8 +25,14 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install only runtime dependencies (no gcc needed!)
+ # Install runtime dependencies + network debugging tools
 RUN apt-get update && apt-get install -y \
   libpq5 \
+  iputils-ping \
+  dnsutils \
+  net-tools \
+  curl \
+  postgresql-client \
   && rm -fr /var/lib/apt/lists/*
 
 # Copy Python packages from builder stage
