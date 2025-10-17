@@ -1,3 +1,4 @@
+import os
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Header 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from app.models.event import Event as EventModel
 from app.models.tenant import Tenant
 from app.schemas.event import Event, EventCreate, EventQuery 
 from app.api.v1.deps import verify_api_key
+import logging
 
 router = APIRouter()
 
@@ -62,7 +64,9 @@ offset: int = 0, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(ve
   
   result = await db.execute(query)
   events = result.scalars().all()
-  
+  logger = logging.getLogger("uvicorn")
+  hostname = os.getenv("HOSTNAME", "unknown")
+  logger.info(f"Handling request on container: {hostname}")
   return events
 
 

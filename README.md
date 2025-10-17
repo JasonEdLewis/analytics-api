@@ -94,26 +94,26 @@ docker build -t  <image_name_of_your_choosing>:<version_of_your_choosing> . # fr
 docker build -t analytics-api:latest .
 docker images | grep <image_youre_looking_for>
 
-docker-compose up -d --build (start in detached mode)
+docker compose up -d --build (start in detached mode)
 
 docker-compose down
 # follow logs (live)
-docker-compose logs -f
+docker compose logs -f
 
 # follow only api logs (live)
-docker-compose logs -f api
+docker compose logs -f api
 
 # follow only db logs (live)
-docker-compose logs -f db
+docker compose logs -f db
 
-docker-compose ps
+docker compose ps
 
 
 # Stop containers
-docker-compose down
+docker compose down
 
 # Remove volumes (fresh start)
-docker-compose down -v
+docker compose down -v
 
 # Clean up
 docker system prune -f
@@ -142,7 +142,7 @@ docker-compose exec db psql -U appuser -d analytics_api -c "SELECT COUNT(*) FROM
   docker inspect analytics_api | grep IP
 
   # To ping one network from the container of a connected network
-  docker-compose exec -u  root <service_name> bash
+  docker compose exec -u  root <service_name> bash
   eg : docker-compose exec -u  root api bash
   #  then....
   ping -c 3 <service-name>
@@ -153,24 +153,43 @@ docker-compose exec db psql -U appuser -d analytics_api -c "SELECT COUNT(*) FROM
 
  ## Force Docker-compose rebuild after updating Dockerfile
   # Stop everything
-    docker-compose down
+    docker compose down
 
   # Remove the image to force rebuild
     docker rmi analytics_api_api
 
   # Or remove all images
-    docker-compose down --rmi all
+    docker compose down --rmi all
 
   # Rebuild from scratch (no cache)
-    docker-compose build --no-cache
+    docker compose build --no-cache
 
   # Start
-    docker-compose up -d
+    docker compose up -d
 
   # Wait for startup
     sleep 10
 
   # Test
-    docker-compose exec -u root api bash
+    docker compose exec -u root api bash
     nslookup db    # Should work now!
     ping -c 3 db   # Should work now!
+
+
+# List all networks 
+docker network ls
+# Inspect network
+docker network inspect analytics_api_analytics_network
+# See which containers are on a network
+docker network inspect analytics_api_analytics_network | grep Name
+# Create custom network
+docker network create my_network
+# Connect container to network (while running) 
+docker network connect my_network analytics_api
+# Disconnect container from network
+docker network disconnect my_network analytics_api
+# Remove unused networks docker network prune
+# Get container's IP
+docker inspect analytics_api | grep IPAddress
+# See all IPs in network
+docker network inspect analytics_api_analytics_network | grep IPv4Address

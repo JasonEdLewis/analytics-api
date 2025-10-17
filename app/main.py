@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.endpoints import events, analytics, tenants, auth
+from datetime import datetime, timezone
 
 # Create FastAPI application
 app = FastAPI(
@@ -21,14 +22,6 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for load balancers."""
-    return {"status": "healthy"}
-
-
 @app.get("/")
 async def root():
     """Root endpoint."""
@@ -38,6 +31,15 @@ async def root():
         "health": "/health"
     }
 
+
+@app.get("/health")
+async def health_check():
+  """Health check endpoint for load balancers."""
+  return {
+    'status':'healthy',
+    'timestamp' : datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    }
+  
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["authentication"])
 app.include_router(tenants.router, prefix=f"{settings.API_V1_PREFIX}/tenants", tags=["tenants"])
 app.include_router(events.router, prefix=f"{settings.API_V1_PREFIX}/events", tags=["events"])

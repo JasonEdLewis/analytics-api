@@ -50,7 +50,7 @@ async def create_test_tenant():
     print(f" API-key: {api_key.key} ")
     return tenant, user, api_key
   
-async def load_events(tenant_id: int, count: int = 50000):
+async def load_events(tenant_id: int, count: int = 10000):
     """Load test events for a tenant."""
     
     # Event types with realistic properties 
@@ -84,7 +84,8 @@ async def load_events(tenant_id: int, count: int = 50000):
     
     print(f"Loading {count} events...")
     
-    async with AsyncSessionLocal() as db: batch_size = 1000
+    async with AsyncSessionLocal() as db: 
+      batch_size = 1000
     for i in range(0, count, batch_size):
       events = []
       for j in range(batch_size): 
@@ -119,7 +120,7 @@ async def main():
       tenant, user, api_key = await create_test_tenant()
       
     # Load events
-    await load_events(tenant.id, count=50000) 
+    await load_events(tenant.id, count=10000) 
     print("\n ✅ Test data loading complete!") 
     print(f"\n📊 Summary:")
     print("- API running at: http://localhost:8000")

@@ -1,0 +1,58 @@
+services:
+  db:
+   image: postgres:16-alpine
+   container_name: analytics_db
+   environment:
+     POSTGRES_DB: analytics_api
+     POSTGRES_USER: appuser
+     POSTGRES_PASSWORD: appuser_pw
+     POSTGRES_INITDB_ARGS: "--encoding=utf8"
+   volumes:
+    - postgres_data:/var/lib/postgresql/data
+   ports:
+   - "5432:5432"
+   healthcheck:
+     test: ["CMD-SHELL","pg_isready -U appuser  -d analytics_api"]
+     interval: 10s
+     timeout: 5s
+     retries: 5
+   networks:
+    - analytics_network
+  api:
+   build:
+    context: .
+    dockerfile: Dockerfile
+   container_name: analytics_api
+   env_file:
+    - .env.docker
+   environment:
+    PYTHONPATH: /app 
+   ports:
+     - "8000:8000"
+   volumes:
+     - ./app:/app/app
+     - ./alembic:/app/alembic 
+     - /app/app/__pycache__
+     - /app/app/.pytest_cache
+   depends_on:
+    db:
+     condition: service_healthy
+   networks:
+    - analytics_network
+
+   command: >
+    sh -c "
+      echo 'waiting for database...' &&
+      sleep 5 &&
+      echo 'Running migrations...' &&
+      alembic upgrade head &&
+      echo 'Starting server...' &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    "
+volumes:
+ postgres_data:
+  driver: local
+
+networks:
+ analytics_network:
+   driver: bridge
