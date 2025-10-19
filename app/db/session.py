@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker 
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
-
+from sqlalchemy.pool import NullPool, QueuePool
+import os
 # Create async engine
 # This is THE connection to your database
 # Think of this as the "phone line" to your pantry

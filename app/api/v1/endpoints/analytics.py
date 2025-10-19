@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, text, Row
 from datetime import datetime, timedelta, timezone
@@ -8,9 +8,10 @@ from app.models.event import Event as EventModel
 from app.models.tenant import Tenant
 from app.api.v1.deps import verify_api_key
 from pydantic import BaseModel
+from app.core.logging import setup_logging
 
 router = APIRouter()
-
+logger = setup_logging()
 
 class EventCount(BaseModel):
     """Response model for event counts"""
@@ -37,6 +38,7 @@ async def get_event_count(event_name: str = None, start_date: datetime = None, e
     Example: How many "purchase" events in the last 30 days?
     GET /api/v1/analytics/events/count?event_name=purchase&start_date=2025-01-01 
     """
+    logger.info("Getting events count...")
     query = select(func.count(EventModel.id)).where(
         EventModel.tenant_id == tenant.id)
 
@@ -50,8 +52,10 @@ async def get_event_count(event_name: str = None, start_date: datetime = None, e
         query = query.where(EventModel.created_at <=end_date)
 
     result = await db.execute(query)
+    if not result:
+        logger.error("No count of total events could not be calculated")
     count = result.scalar()
-
+    logger.info(f"Event count query successful")
     return {'count': count}
 
 
@@ -74,14 +78,20 @@ async def get_event_breakdown(
 
     if end_date:
         query = query.where(EventModel.end_date <= end_date)
-
-    result = await db.execute(query)
-
-    breakdown = [
+        
+    try:
+        result = await db.execute(query)
+        breakdown = [
         EventCount(event_name=row[0], count=row[1]) for row in result.all()
-    ]
+        ]
 
-    return breakdown
+        return breakdown
+    except Exception as e:
+        logger.error(f"Query count not return a result for events",exception=e)
+        
+    if not result:
+        return  logger.error("Query count not return a result")
+    
 
 
 @router.get("/events/timeseries", response_model=List[TimeSeriesPoint])
@@ -118,13 +128,17 @@ async def get_event_timeseries(
              )
     if event_name:
       query = query.where(EventModel.event_name == event_name)
-      
-    result = await db.execute(query)
-    timeseries =[
-      TimeSeriesPoint(date=row[0], count=row[1]) for row in result.all()
-    ]
-    return timeseries
+    
+    try:
+        result = await db.execute(query)
+        timeseries =[
+        TimeSeriesPoint(date=row[0], count=row[1]) for row in result.all()
+        ]
+        return timeseries
+    except Exception as e:
+        logger.error("Time series encountered an error", exception=e)
   
+
 @router.get("/properties/breakdown", response_model=List[PropertyBreakdown])
 async def get_property_breakdown(
     event_name: str,
@@ -132,33 +146,43 @@ async def get_property_breakdown(
     start_date: datetime = None,
     end_date: datetime = None,
     limit: int = 10,
-    db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)
-  ):
+    db: AsyncSession = Depends(get_db),
+    tenant: Tenant = Depends(verify_api_key)
+):
     """
     Get breakdown of property values for a specific event. Uses JSONB querying power!
     Example: What are the top pages viewed?
     GET /api/v1/analytics/properties/breakdown?event_name=page_view&property_key=page
     This queries the JSONB "properties" field!
     """
-    query = (select( func.jsonb_extract_path_text(
-      EventModel.properties,
-      property_key
-    ).label('value'), func.count(EventModel.id).label('count')
-    ).where(EventModel.tenant_id == tenant.id)
-    .where(EventModel.event_name == event_name) .where(EventModel.properties.has_key(property_key)) # Only events with this property .group_by(text('value'))
-    .order_by(func.count(EventModel.id).desc())
-    .limit(limit)
-    )
     
-    if start_date:
-      query = query.where(EventModel.created_at >= start_date)
-      
-    if end_date:
-      query = query.where(EventModel.created_at <= end_date)
-      
-    result = await db.execute(query)
-    breakdown = [
-      PropertyBreakdown(value=row[0],count=row[1]) for row in result.all()
-    ]
-    
-    return breakdown
+    try:
+        query = (select(
+            func.jsonb_extract_path_text(EventModel.properties, property_key).label('value'),
+            func.count(EventModel.id).label('count')
+        ).where(EventModel.tenant_id == tenant.id)
+        .where(EventModel.event_name == event_name)
+        .where(EventModel.properties.has_key(property_key))
+        .group_by(text('value'))
+        .order_by(func.count(EventModel.id).desc())
+        .limit(limit)
+        )
+        
+        if start_date:
+            query = query.where(EventModel.created_at >= start_date)
+        
+        if end_date:
+            query = query.where(EventModel.created_at <= end_date)
+        
+        result = await db.execute(query)
+        breakdown = [
+            PropertyBreakdown(value=row[0], count=row[1]) 
+            for row in result.all()
+        ]
+        return breakdown
+    except Exception as e:
+        logger.error(
+            f"Error occured getting {property_key} property info for {event_name} event",
+            exception=e
+        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve property breakdown")

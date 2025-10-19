@@ -3,7 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.endpoints import events, analytics, tenants, auth
 from datetime import datetime, timezone
+from app.core.logging import setup_logging
+import logging
 
+# Configure logging for slow queries
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Log all SQLAlchemy queries slower than 1 second
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+
+loggger = setup_logging()
 # Create FastAPI application
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -11,6 +22,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
 
 # CORS middleware
 if settings.BACKEND_CORS_ORIGINS:
@@ -35,6 +47,7 @@ async def root():
 @app.get("/health")
 async def health_check():
   """Health check endpoint for load balancers."""
+  loggger.info("Health check requested.")
   return {
     'status':'healthy',
     'timestamp' : datetime.now(timezone.utc).strftime('%Y-%m-%d')

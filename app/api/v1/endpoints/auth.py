@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password, create_access_token 
 from app.db.session import get_db
+from app.models.tenant import Tenant
 from app.models.user import User
 from pydantic import BaseModel, EmailStr
 
