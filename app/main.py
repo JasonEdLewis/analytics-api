@@ -1,9 +1,11 @@
 from fastapi import FastAPI
+from app.tasks.partitions import start_scheduler
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.endpoints import events, analytics, tenants, auth
 from datetime import datetime, timezone
 from app.core.logging import setup_logging
+from app.core.rate_limit import limiter, add_rate_limit_middleware
 import logging
 
 # Configure logging for slow queries
@@ -22,7 +24,21 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+app.state.limiter = limiter
+add_rate_limit_middleware(app)
+# Start scheduler on startup
+scheduler = None
 
+@app.on_event("startup")
+async def startup_event():
+    global scheduler
+    scheduler = start_scheduler()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global scheduler
+    if scheduler:
+        scheduler.shutdown()
 
 # CORS middleware
 if settings.BACKEND_CORS_ORIGINS:
@@ -52,7 +68,8 @@ async def health_check():
     'status':'healthy',
     'timestamp' : datetime.now(timezone.utc).strftime('%Y-%m-%d')
     }
-  
+
+
 app.include_router(auth.router, prefix=f"{settings.API_V1_PREFIX}/auth", tags=["authentication"])
 app.include_router(tenants.router, prefix=f"{settings.API_V1_PREFIX}/tenants", tags=["tenants"])
 app.include_router(events.router, prefix=f"{settings.API_V1_PREFIX}/events", tags=["events"])

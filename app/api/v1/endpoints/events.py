@@ -1,30 +1,33 @@
 import os
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Header 
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db.session import get_db
 from app.models.event import Event as EventModel
 from app.models.tenant import Tenant
-from app.schemas.event import Event, EventCreate, EventQuery 
+from app.schemas.event import Event, EventCreate, EventQuery
 from app.api.v1.deps import verify_api_key
 from app.core.logging import setup_logging
+from app.core.cache import set_cached, get_cached, delete_cached, delete_pattern, invalidate_tenant_cache
+# from app.core.rate_limit import limiter
 
 
 logger = setup_logging()
 router = APIRouter()
 
 
-@router.post("/", response_model=Event, status_code=201) 
-async def create_event(event_in: EventCreate, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
+@router.post("/", response_model=Event, status_code=201)
+# @limiter.limit("1000/min")
+async def create_event(request:Request,event_in: EventCreate, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
   """
   Create a new event (requires API key). This is the main ingestion endpoint.
   Example:
   POST /api/v1/events
   Headers: X-API-Key: your-api-key
   Body: {
-    "event_name": "page_view", 
+    "event_name": "page_view",
     "properties": {
     "page": "/dashboard",
     "user_id": "user_123" }
@@ -33,18 +36,21 @@ async def create_event(event_in: EventCreate, db: AsyncSession = Depends(get_db)
   try:
     event = EventModel(tenant_id=tenant.id,**event_in.model_dump())
     logger.info("Creating event")
+    await invalidate_tenant_cache(tenant.id, event_in.event_name)
     db.add(event)
-    await db.commit() 
+    await db.commit()
     await db.refresh(event)
     logger.info(f"{event_in.event_name} event created successfully")
+
     return event
-  
+
   except Exception as e:
     logger.error(f"Count not create event {event_in.event_name}")
     raise HTTPException(status_code=500, detail=f"Failed to create event {event_in.event_name}")
 
-@router.get("/", response_model=List[Event]) 
-async def list_events(event_name: str = None, start_date: datetime = None, end_date: datetime = None, limit: int = 100,
+@router.get("/", response_model=List[Event])
+# @limiter.limit("1000/min")
+async def list_events(request:Request,event_name: str = None, start_date: datetime = None, end_date: datetime = None, limit: int = 100,
 offset: int = 0, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
   """
   Query events with filters.
@@ -54,25 +60,35 @@ offset: int = 0, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(ve
   # Build query with filters
   try:
     query = select(EventModel).where(EventModel.tenant_id == tenant.id)
-    
+
     if event_name:
       query = query.where(EventModel.event_name == event_name)
-      
+
     if start_date:
       query = query.where(EventModel.created_at >= start_date)
-    
+
     if end_date:
       query = query.where(EventModel.created_at <= end_date)
-      
+
     # Order by newest first
     query = query.order_by(EventModel.created_at.desc())
-    
+
     # Pagination
     query = query.offset(offset).limit(min(limit,1000))
+
+    hostname = os.getenv("HOSTNAME", "unknown")
+    cache_key= f'events:{event_name}:{start_date}:{end_date}'
+    got_cache = await get_cached(cache_key)
+    if got_cache:
+      logger.info(f"Cache hit: {cache_key}")
+      logger.info(f"Handling request on container: {hostname}")
+      return [Event(**item) for item in got_cache]
     
     result = await db.execute(query)
     events = result.scalars().all()
-    hostname = os.getenv("HOSTNAME", "unknown")
+    
+    logger.info(f"Setting Cache for {cache_key}")
+    await set_cached(cache_key, events, ttl=3600) 
     logger.info(f"Handling request on container: {hostname}")
     return events
   except Exception as e:
@@ -80,10 +96,11 @@ offset: int = 0, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(ve
     raise HTTPException(status_code=500, detail="Failed to retrieve property breakdown")
 
 
-@router.get("/{event_id}", response_model=Event) 
-async def get_event(event_id: int, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
+@router.get("/{event_id}", response_model=Event)
+# @limiter.limit("1/min")
+async def get_event(request:Request,event_id: int, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
   """
-  Get a specific event by ID. 
+  Get a specific event by ID.
   """
   try:
     result = await db.execute(select(EventModel).where(EventModel.id == event_id) .where(EventModel.tenant_id == tenant.id)
@@ -93,7 +110,6 @@ async def get_event(event_id: int, db: AsyncSession = Depends(get_db), tenant: T
     if not event:
       raise HTTPException(status_code=400, detail='Event not found')
     return event
-  except Exception as e:  
+  except Exception as e:
     logger.error(f"Count not find event {event_id}")
     raise HTTPException(status_code=500, detail=f"Failed to retrieve event {event_id}")
-    

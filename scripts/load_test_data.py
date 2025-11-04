@@ -94,7 +94,7 @@ async def load_events(tenant_id: int, count: int = 10000):
         # Pick random event template
         template = random.choice(event_templates)
         # Create event with timestamp in the last 30 days
-        days_ago = random.uniform(0, 30)
+        days_ago = random.uniform(0, 365)
         created_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
         event = EventModel( tenant_id=tenant_id, event_name=template["name"], properties=template["properties"](), created_at=created_at
         ) 

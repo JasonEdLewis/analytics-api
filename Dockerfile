@@ -1,61 +1,47 @@
-# Builder install dependencies
-FROM python:3.12-slim AS builder
-
-# Set working directory
+# Builder
+FROM python:3.13-slim AS builder
 WORKDIR /app
 
-# Install system dependencies for PostgreSQL and cryptography
-RUN apt-get update && apt-get install -y \
-  gcc\
-  postgresql-client\
-  libpq-dev\
-  && rm -fr /var/lib/apt/lists/*
+# (Optional) You no longer need libpq-dev if using psycopg[binary],
+# but keep build tools if any other packages need a compiler.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy only requirements first (Docker layer caching!)
 COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip &&\
+RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime (actual application)
-FROM python:3.12-slim
-
-# Set working directory
+# Runtime
+FROM python:3.13-slim
 WORKDIR /app
 
-# Install only runtime dependencies (no gcc needed!)
- # Install runtime dependencies + network debugging tools
-RUN apt-get update && apt-get install -y \
-  libpq5 \
-  iputils-ping \
-  iproute2 \
-  dnsutils \
-  net-tools \
-  curl \
-  postgresql-client \
-  && rm -fr /var/lib/apt/lists/*
+# You don't need libpq5 for psycopg[binary]; keep psql tools only if you use them.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iputils-ping iproute2 dnsutils net-tools curl postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# App sources
 COPY ./app /app/app
-COPY ./alembic /app/alembic 
+COPY ./alembic /app/alembic
 COPY ./alembic.ini /app/alembic.ini
 COPY ./scripts /app/scripts
 COPY ./nginx.conf /app/nginx.conf
+# FIX: this path was missing a leading slash on the destination
+COPY ./app/tasks /app/app/tasks
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-  chown -R appuser:appuser /app
+# Non-root
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port 
 EXPOSE 8000
 
-# Health check
+# FIX: your server runs on 8000, and 'requests' isn't installed; use curl instead
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD python3 -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+  CMD curl -fsS http://localhost:8000/health || exit 1
 
-CMD ["uvicorn","app.main:app", "--host", "localhost", "--port", "8000"]
+CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"]

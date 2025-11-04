@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, text, Row
 from datetime import datetime, timedelta, timezone
@@ -9,6 +9,8 @@ from app.models.tenant import Tenant
 from app.api.v1.deps import verify_api_key
 from pydantic import BaseModel
 from app.core.logging import setup_logging
+from app.core.cache import get_cached, set_cached, delete_cached, delete_pattern
+# from app.core.rate_limit import limiter
 
 router = APIRouter()
 logger = setup_logging()
@@ -32,13 +34,21 @@ class PropertyBreakdown(BaseModel):
 
 
 @router.get("/events/count")
-async def get_event_count(event_name: str = None, start_date: datetime = None, end_date: datetime = None, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
+# @limiter.limit("1/min")
+async def get_event_count(request: Request, event_name: str = None, start_date: datetime = None, end_date: datetime = None, db: AsyncSession = Depends(get_db), tenant: Tenant = Depends(verify_api_key)):
     """
     Get total count of events with optional filters.
     Example: How many "purchase" events in the last 30 days?
-    GET /api/v1/analytics/events/count?event_name=purchase&start_date=2025-01-01 
+    GET /api/v1/analytics/events/count?event_name=purchase&start_date=2025-01-01
     """
+    logger.info(f"Getting events count... Request client: {request.client}")
     logger.info("Getting events count...")
+    cache_key = f"count:{event_name}:{start_date}:{end_date}"
+    got_cache = await get_cached(cache_key)
+    if got_cache:
+        logger.info(f"Cache hit:{cache_key}")
+        return {"count": got_cache}
+    logger.info(f"Cache miss:{cache_key}")
     query = select(func.count(EventModel.id)).where(
         EventModel.tenant_id == tenant.id)
 
@@ -55,12 +65,16 @@ async def get_event_count(event_name: str = None, start_date: datetime = None, e
     if not result:
         logger.error("No count of total events could not be calculated")
     count = result.scalar()
+    await set_cached(cache_key, count, ttl=600)
+
     logger.info(f"Event count query successful")
     return {'count': count}
 
 
 @router.get("/events/breakdown", response_model=List[EventCount])
+# @limiter.limit("1/min")
 async def get_event_breakdown(
+        request:Request,
         start_date: datetime = None,
         end_date: datetime = None,
         limit: int = 10,
@@ -68,8 +82,15 @@ async def get_event_breakdown(
         tenant: Tenant = Depends(verify_api_key)):
     """
     Get breakdown of events by event name. Shows which events are most common.
-    Example: What are the top 10 events in the last week? GET /api/v1/analytics/events/breakdown?limit=10 
+    Example: What are the top 10 events in the last week? GET /api/v1/analytics/events/breakdown?limit=10
     """
+
+    cache_key = f"breakdown:{tenant.id}:{start_date}:{end_date}"
+    got_cache = await get_cached(cache_key)
+    if got_cache:
+        logger.info(f"Cache hit:{cache_key}")
+        return got_cache
+    logger.info(f"Cache miss:{cache_key}")
 
     query = select(EventModel.event_name, func.count(EventModel.id).label('count')).where(
         EventModel.tenant_id == tenant.id).group_by(EventModel.event_name).order_by(func.count(EventModel.id).desc()) .limit(limit)
@@ -77,43 +98,53 @@ async def get_event_breakdown(
         query = query.where(EventModel.created_at >= start_date)
 
     if end_date:
-        query = query.where(EventModel.end_date <= end_date)
-        
+        query = query.where(EventModel.created_at <= end_date)
+
     try:
         result = await db.execute(query)
         breakdown = [
         EventCount(event_name=row[0], count=row[1]) for row in result.all()
         ]
+        await set_cached(cache_key, breakdown, 3600)
 
         return breakdown
     except Exception as e:
         logger.error(f"Query count not return a result for events",exception=e)
-        
+
     if not result:
         return  logger.error("Query count not return a result")
-    
+
 
 
 @router.get("/events/timeseries", response_model=List[TimeSeriesPoint])
+# @limiter.limit("1/min")
 async def get_event_timeseries(
+    request:Request,
     event_name: str = None,
+    tenant: Tenant = Depends(verify_api_key),
     start_date: datetime = Query(default=None),
     end_date: datetime = Query(default=None),
-    interval: str = Query(default="day", regex="^(hour|day|week|month)$"), db: AsyncSession = Depends(get_db),
-    tenant: Tenant = Depends(verify_api_key)
+    interval: str = Query(default="day", regex="^(hour|day|week|month)$"), db: AsyncSession = Depends(get_db)
 ):
     """
     Get time series data for events.
     Shows events over time (hourly, daily, weekly, monthly).
     Example: Daily "page_view" counts for last 30 days
-    GET /api/v1/analytics/events/timeseries?event_name=page_view&interval=day 
+    GET /api/v1/analytics/events/timeseries?event_name=page_view&interval=day
     """
+    # Check if query is cached in Redis
+    cache_key = f"timeseries:{event_name}:{tenant.id}:{start_date}:{end_date}"
+    got_cached = await get_cached(cache_key)
+    if got_cached:
+        logger.info(f"Cache hit:{cache_key}")
+        return got_cached
+    logger.info(f"Cache miss:{cache_key}")
 
     if not end_date:
-        end_date = datetime.now(timezone.utc())
+        end_date = datetime.now(timezone.utc)
 
     if not start_date:
-        start_date = end_date - timedelta(days=30)
+        start_date = datetime.now(timezone.utc) - timedelta(days=30)
 
     # PostgreSQL date truncation based on interval
     trunc_func = {
@@ -128,19 +159,22 @@ async def get_event_timeseries(
              )
     if event_name:
       query = query.where(EventModel.event_name == event_name)
-    
+
     try:
         result = await db.execute(query)
         timeseries =[
-        TimeSeriesPoint(date=row[0], count=row[1]) for row in result.all()
+        TimeSeriesPoint(date=row[0].isoformat() if hasattr(row[0], 'isoformat') else str(row[0]), count=row[1]) for row in result.all()
         ]
+        await set_cached(cache_key, timeseries, ttl=3600)
         return timeseries
     except Exception as e:
         logger.error("Time series encountered an error", exception=e)
-  
+
 
 @router.get("/properties/breakdown", response_model=List[PropertyBreakdown])
+# @limiter.limit("1/min")
 async def get_property_breakdown(
+    request:Request,
     event_name: str,
     property_key: str,
     start_date: datetime = None,
@@ -155,7 +189,7 @@ async def get_property_breakdown(
     GET /api/v1/analytics/properties/breakdown?event_name=page_view&property_key=page
     This queries the JSONB "properties" field!
     """
-    
+
     try:
         query = (select(
             func.jsonb_extract_path_text(EventModel.properties, property_key).label('value'),
@@ -167,16 +201,16 @@ async def get_property_breakdown(
         .order_by(func.count(EventModel.id).desc())
         .limit(limit)
         )
-        
+
         if start_date:
             query = query.where(EventModel.created_at >= start_date)
-        
+
         if end_date:
             query = query.where(EventModel.created_at <= end_date)
-        
+
         result = await db.execute(query)
         breakdown = [
-            PropertyBreakdown(value=row[0], count=row[1]) 
+            PropertyBreakdown(value=row[0], count=row[1])
             for row in result.all()
         ]
         return breakdown
